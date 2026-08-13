@@ -13,10 +13,10 @@ try:
     from zeroconf import ServiceBrowser, ServiceInfo, Zeroconf
     ZEROCONF_AVAILABLE = True
 except ImportError:  # pragma: no cover
-    zeroconf = None
-    ServiceBrowser = None
-    ServiceInfo = None
-    Zeroconf = None
+    zeroconf = None  # type: ignore[assignment]
+    ServiceBrowser = None  # type: ignore[assignment]
+    ServiceInfo = None  # type: ignore[assignment]
+    Zeroconf = None  # type: ignore[assignment]
     ZEROCONF_AVAILABLE = False
 
 
