@@ -18,7 +18,9 @@ async def test_http_sse_transport_endpoints() -> None:
     host = "127.0.0.1"
     transport = HttpSseTransport(server, host=host, port=0)
     async_server = await transport.start()
-    port = async_server.sockets[0].getsockname()[1]
+    sockets = async_server.sockets
+    assert sockets is not None and len(sockets) > 0
+    port = sockets[0].getsockname()[1]
 
     try:
         # Test health endpoint
@@ -37,21 +39,20 @@ async def test_http_sse_transport_endpoints() -> None:
 
         # Test MCP post endpoint
         reader, writer = await asyncio.open_connection(host, port)
-        payload = json.dumps({
+        payload_bytes = json.dumps({
             "jsonrpc": "2.0",
             "method": "tools/call",
             "params": {"name": "status"},
             "id": 100,
-        })
-        req = (
+        }).encode("utf-8")
+        req_headers = (
             f"POST /mcp HTTP/1.1\r\n"
             f"Host: {host}\r\n"
             f"Content-Type: application/json\r\n"
-            f"Content-Length: {len(payload)}\r\n"
+            f"Content-Length: {len(payload_bytes)}\r\n"
             f"Connection: close\r\n\r\n"
-            f"{payload}"
-        )
-        writer.write(req.encode("utf-8"))
+        ).encode("utf-8")
+        writer.write(req_headers + payload_bytes)
         await writer.drain()
 
         response = await reader.read()
