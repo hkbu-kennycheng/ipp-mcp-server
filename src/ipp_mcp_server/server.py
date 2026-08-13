@@ -29,7 +29,6 @@ class FastMCPServer:
         self._prompts: Dict[str, Dict[str, Any]] = {}
         self._initialized = False
 
-        # Register default built-in tools for printer discovery & registry
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
@@ -72,16 +71,18 @@ class FastMCPServer:
             self.registry.register_printer(printer)
             return printer.model_dump()
 
-    def tool(self, name: Optional[str] = None, description: Optional[str] = None) -> Callable:
+    def tool(
+        self, name: Optional[str] = None, description: Optional[str] = None
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator to register a tool with the MCP server."""
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             tool_name = name or func.__name__
             tool_desc = description or (func.__doc__.strip() if func.__doc__ else "")
             self.register_tool(tool_name, tool_desc, func)
             return func
         return decorator
 
-    def register_tool(self, name: str, description: str, func: Callable) -> None:
+    def register_tool(self, name: str, description: str, func: Callable[..., Any]) -> None:
         """Register a tool function explicitly."""
         self._tools[name] = {
             "name": name,
