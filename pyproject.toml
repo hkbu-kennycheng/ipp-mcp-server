@@ -13,7 +13,6 @@ authors = [
     { name = "Kam Kong Cheng", email = "kennycheng.hkbu@gmail.com" }
 ]
 dependencies = [
-    "fastmcp>=0.1.0",
     "pyipp>=0.11.0",
     "zeroconf>=0.131.0",
     "pydantic>=2.0.0",
