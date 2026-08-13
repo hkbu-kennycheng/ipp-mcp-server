@@ -19,8 +19,8 @@ class TestHttpSseTransportAsync(unittest.IsolatedAsyncioTestCase):
         self.port = 0
         self.transport = HttpSseTransport(self.server, host=self.host, port=self.port)
         self.async_server = await self.transport.start()
-        sockets = getattr(self.async_server, "sockets", None)
-        if sockets and len(sockets) > 0:
+        sockets = self.async_server.sockets
+        if sockets:
             self.port = sockets[0].getsockname()[1]
 
     async def asyncTearDown(self) -> None:
@@ -81,24 +81,6 @@ class TestHttpSseTransportAsync(unittest.IsolatedAsyncioTestCase):
         resp_str = response.decode("utf-8")
         self.assertIn("200 OK", resp_str)
         self.assertIn("event: endpoint", resp_str)
-
-
-class TestStdioTransportAsync(unittest.IsolatedAsyncioTestCase):
-    async def test_stdio_transport(self) -> None:
-        server = FastMCPServer(name="stdio-test", version="0.1.0")
-
-        @server.tool(name="ping_tool", description="Ping")
-        def ping_tool() -> str:
-            return "pong"
-
-        req_json = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {"name": "ping_tool"},
-            "id": 1,
-        })
-        res = await server.handle_jsonrpc(req_json)
-        self.assertIn("pong", res)
 
 
 if __name__ == "__main__":

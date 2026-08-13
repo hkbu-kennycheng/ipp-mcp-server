@@ -2,7 +2,7 @@
 
 import json
 import unittest
-from ipp_mcp_server.config import ServerConfig, TransportType
+from ipp_mcp_server.config import TransportType
 from ipp_mcp_server.server import FastMCPServer, create_server
 
 
