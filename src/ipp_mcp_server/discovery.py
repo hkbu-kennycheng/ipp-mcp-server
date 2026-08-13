@@ -122,7 +122,7 @@ class PrinterServiceListener:
     """Zeroconf ServiceListener callback for mDNS discovery."""
 
     def __init__(self, registry: Optional[PrinterRegistry] = None) -> None:
-        self.registry = registry or defaultregistry
+        self.registry = registry or default_registry
 
     def add_service(self, zc: Any, type_: str, name: str) -> None:
         """Handle newly discovered mDNS printing service."""
