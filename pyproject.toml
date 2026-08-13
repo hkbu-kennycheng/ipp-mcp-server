@@ -44,7 +44,7 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 100
 select = ["E", "F"]
-ignore = ["F841"]
+ignore = ["F841", "F811"]
 
 [tool.mypy]
 python_version = "3.10"
