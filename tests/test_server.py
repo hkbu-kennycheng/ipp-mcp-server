@@ -17,15 +17,22 @@ class TestFastMCPServer(unittest.TestCase):
         self.assertEqual(srv.version, "0.1.0")
         self.assertEqual(srv.config.transport, TransportType.STDIO)
 
-    def test_tool_registration(self) -> None:
+    def test_default_tools_and_custom_tool_registration(self) -> None:
+        # Default tools: list_printers, get_printer, register_printer
+        tools_initial = self.server.list_tools()
+        tool_names = [t["name"] for t in tools_initial]
+        self.assertIn("list_printers", tool_names)
+        self.assertIn("get_printer", tool_names)
+        self.assertIn("register_printer", tool_names)
+
         @self.server.tool(name="echo", description="Echo input message")
         def echo_func(message: str) -> str:
             return f"Echo: {message}"
 
-        tools = self.server.list_tools()
-        self.assertEqual(len(tools), 1)
-        self.assertEqual(tools[0]["name"], "echo")
-        self.assertEqual(tools[0]["description"], "Echo input message")
+        tools_after = self.server.list_tools()
+        self.assertEqual(len(tools_after), len(tools_initial) + 1)
+        tool_names_after = [t["name"] for t in tools_after]
+        self.assertIn("echo", tool_names_after)
 
     def test_handle_jsonrpc_initialize(self) -> None:
         req = json.dumps({
@@ -76,6 +83,17 @@ class TestFastMCPServer(unittest.TestCase):
         resp_hello = json.loads(asyncio.run(self.server.handle_jsonrpc(call_hello)))
         self.assertEqual(resp_hello["result"]["content"][0]["text"], "Hello World")
 
+    def test_handle_jsonrpc_default_list_printers_tool(self) -> None:
+        call_list = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": "list_printers", "arguments": {}},
+            "id": 5,
+        })
+        resp = json.loads(asyncio.run(self.server.handle_jsonrpc(call_list)))
+        self.assertIn("result", resp)
+        self.assertEqual(resp["result"]["content"][0]["text"], "[]")
+
     def test_handle_jsonrpc_errors(self) -> None:
         # Invalid JSON
         resp_invalid = json.loads(asyncio.run(self.server.handle_jsonrpc("invalid json")))
@@ -86,7 +104,7 @@ class TestFastMCPServer(unittest.TestCase):
             "jsonrpc": "2.0",
             "method": "tools/call",
             "params": {"name": "nonexistent"},
-            "id": 5,
+            "id": 6,
         })
         resp_unknown = json.loads(asyncio.run(self.server.handle_jsonrpc(call_unknown)))
         self.assertEqual(resp_unknown["error"]["code"], -32601)

@@ -1,16 +1,8 @@
-# Architecture Decision Record (ADR) Template
+# Template: Architecture Decision Record (ADR)
 
-## Title
-[Short descriptive title]
+## ADR [NUMBER]: [TITLE]
 
-* **Status**: [Proposed | Accepted | Rejected | Superseded]
-* **Date**: [YYYY-MM-DD]
-
-## Context
-[What is the context and problem we are trying to solve?]
-
-## Decision
-[What is the change/decision being proposed or adopted?]
-
-## Consequences
-[What are the trade-offs and implications of this decision?]
+- **Status**: [Proposed | Accepted | Deprecated | Superseded]
+- **Context**: [Describe the problem and context]
+- **Decision**: [Describe the decision made]
+- **Consequences**: [Describe consequences and trade-offs]

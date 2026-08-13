@@ -1,10 +1,11 @@
-"""FastMCP / MCP Server core implementation."""
+"""FastMCP / MCP Server core implementation with Printer Registry integration."""
 
 import asyncio
 import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
 from ipp_mcp_server.config import ServerConfig
+from ipp_mcp_server.registry import PrinterInfo, PrinterRegistry, default_registry
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +13,64 @@ logger = logging.getLogger(__name__)
 class FastMCPServer:
     """FastMCP Server providing tools, resources, and transport handling."""
 
-    def __init__(self, name: str = "ipp-mcp-server", version: str = "0.1.0", config: Optional[ServerConfig] = None) -> None:
+    def __init__(
+        self,
+        name: str = "ipp-mcp-server",
+        version: str = "0.1.0",
+        config: Optional[ServerConfig] = None,
+        registry: Optional[PrinterRegistry] = None,
+    ) -> None:
         self.name = name
         self.version = version
         self.config = config or ServerConfig(name=name, version=version)
+        self.registry = registry or default_registry
         self._tools: Dict[str, Dict[str, Any]] = {}
         self._resources: Dict[str, Dict[str, Any]] = {}
         self._prompts: Dict[str, Dict[str, Any]] = {}
         self._initialized = False
+
+        # Register default built-in tools for printer discovery & registry
+        self._register_default_tools()
+
+    def _register_default_tools(self) -> None:
+        """Register default tools for multi-printer registry management."""
+
+        @self.tool(name="list_printers", description="List all discovered and registered IPP printers.")
+        def list_printers() -> List[Dict[str, Any]]:
+            printers = self.registry.list_printers()
+            return [p.model_dump() for p in printers]
+
+        @self.tool(name="get_printer", description="Get details for a specific printer by printer_id.")
+        def get_printer(printer_id: str) -> Optional[Dict[str, Any]]:
+            printer = self.registry.get_printer(printer_id)
+            return printer.model_dump() if printer else None
+
+        @self.tool(name="register_printer", description="Manually register or update an IPP printer profile.")
+        def register_printer(
+            printer_id: str,
+            name: str,
+            host: str,
+            port: int = 631,
+            path: str = "ipp/print",
+            is_tls: bool = False,
+            pdl: Optional[List[str]] = None,
+        ) -> Dict[str, Any]:
+            scheme = "ipps" if is_tls else "ipp"
+            clean_path = path.lstrip("/")
+            uri = f"{scheme}://{host}:{port}/{clean_path}"
+            printer = PrinterInfo(
+                printer_id=printer_id,
+                name=name,
+                host=host,
+                port=port,
+                path=clean_path,
+                uri=uri,
+                pdl=pdl or [],
+                is_tls=is_tls,
+                state="idle",
+            )
+            self.registry.register_printer(printer)
+            return printer.model_dump()
 
     def tool(self, name: Optional[str] = None, description: Optional[str] = None) -> Callable:
         """Decorator to register a tool with the MCP server."""
@@ -114,6 +165,11 @@ class FastMCPServer:
             })
 
 
-def create_server(name: str = "ipp-mcp-server", version: str = "0.1.0", config: Optional[ServerConfig] = None) -> FastMCPServer:
+def create_server(
+    name: str = "ipp-mcp-server",
+    version: str = "0.1.0",
+    config: Optional[ServerConfig] = None,
+    registry: Optional[PrinterRegistry] = None,
+) -> FastMCPServer:
     """Factory function to create a FastMCPServer instance."""
-    return FastMCPServer(name=name, version=version, config=config)
+    return FastMCPServer(name=name, version=version, config=config, registry=registry)

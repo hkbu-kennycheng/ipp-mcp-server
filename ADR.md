@@ -1,9 +1,11 @@
-# Architecture Decision Records (ADR) - IPP MCP Server
+# Architecture Decision Records (ADR)
 
-## ADR 1: Adoption of FastMCP Framework and Async Python Architecture
+## ADR 001: FastMCP as Server Framework
+- **Status**: Accepted
+- **Context**: The project requires a reliable, standard MCP server implementation in Python.
+- **Decision**: Adopt FastMCP framework with support for stdio and SSE transports.
 
-* **Status**: Accepted
-* **Date**: 2026-08-12
-* **Context**: The server must bridge Large Language Model host applications (via stdio and SSE transports) with physical IPP printers across local area networks.
-* **Decision**: We adopt the `fastmcp` Python framework for MCP transport management and capability routing, coupled with `pyipp` and `zeroconf` for asynchronous network operations.
-* **Consequences**: FastMCP abstracts standard JSON-RPC RPC negotiation, tool schema generation via Pydantic, and progress reporting streaming while keeping non-blocking async network loops lightweight and scalable.
+## ADR 002: zeroconf for mDNS Printer Discovery
+- **Status**: Accepted
+- **Context**: Need to discover IPP/IPPS printers on local network via DNS-SD/mDNS.
+- **Decision**: Use python zeroconf library and Listener pattern for automatic registry updates.

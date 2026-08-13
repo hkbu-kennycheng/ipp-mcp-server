@@ -1,19 +1,14 @@
-"""Tests verifying repository setup and module imports."""
+"""Repository structure verification tests."""
 
 import unittest
-import ipp_mcp_server
+from ipp_mcp_server.config import ServerConfig, TransportType
 
 
 class TestRepoSetup(unittest.TestCase):
-    def test_version(self) -> None:
-        """Verify package version is set."""
-        self.assertEqual(ipp_mcp_server.__version__, "0.1.0")
-
-    def test_main_import(self) -> None:
-        """Verify main entrypoint function can be imported."""
-        from ipp_mcp_server.main import main
-
-        self.assertTrue(callable(main))
+    def test_imports_and_config(self) -> None:
+        cfg = ServerConfig()
+        self.assertEqual(cfg.name, "ipp-mcp-server")
+        self.assertEqual(cfg.transport, TransportType.STDIO)
 
 
 if __name__ == "__main__":

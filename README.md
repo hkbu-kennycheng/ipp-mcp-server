@@ -1,26 +1,14 @@
 # IPP MCP Server
 
-An Internet Printing Protocol (IPP) Model Context Protocol (MCP) Server for multi-printer management and AI-assisted physical document rendering.
+Model Context Protocol (MCP) Server for IPP Multi-Printer Management.
 
 ## Overview
-
-The IPP MCP Server enables Large Language Model (LLM) agents to interact with local and networked IPP-compatible printers. It translates high-level agent intents into deterministic IPP binary requests.
+This server acts as a centralized bridge, enabling LLMs to discover, monitor, and send print jobs to IPP printers.
 
 ## Features
+- **mDNS Discovery**: Automatic detection of networked IPP printers via zeroconf.
+- **Printer Registry**: Thread-safe multi-printer management and capability queries.
+- **FastMCP Protocol**: JSON-RPC interface for tool calls, resources, and prompts.
 
-- **Multi-Printer Registry**: Manage multiple printer endpoints simultaneously.
-- **Core IPP Operations**: `get_printer_status`, `submit_print_job`, `list_active_jobs`, `cancel_print_job`.
-- **Automatic mDNS Discovery**: Discover local IPP/IPPS network printers.
-- **FastMCP Protocol Integration**: Supports stdio and SSE transport mechanisms.
-
-## Installation
-
-```bash
-pip install -e .
-```
-
-## Running Tests
-
-```bash
-python -m pytest
-```
+## License
+MIT

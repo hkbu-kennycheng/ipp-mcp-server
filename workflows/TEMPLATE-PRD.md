@@ -1,12 +1,8 @@
-# Product Requirements Document (PRD) Template
+# Template: Product Requirements Document (PRD)
 
-## Executive Summary
-[Summary of project goals and scope]
+## PRD: [FEATURE TITLE]
 
-## Requirements
-1. [Functional Requirement 1]
-2. [Functional Requirement 2]
-
-## Non-Functional Requirements
-- Performance:
-- Security:
+- **Objective**: [Goal of the feature]
+- **Requirements**: [Functional requirements]
+- **Architecture**: [Design and interfaces]
+- **Success Criteria**: [Verification metrics]
