@@ -44,6 +44,10 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["F841"]
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
