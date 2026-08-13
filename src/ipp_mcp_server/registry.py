@@ -1,5 +1,7 @@
 """Printer Registry for IPP MCP Server."""
 
+from __future__ import annotations
+
 import logging
 import threading
 from typing import Dict, List, Optional

@@ -1,5 +1,7 @@
 """mDNS Discovery service for IPP printers using DNS-SD / zeroconf."""
 
+from __future__ import annotations
+
 import logging
 import re
 from typing import Any, Dict, List, Optional, Union
@@ -82,7 +84,6 @@ def construct_printer_info_from_mdns(
     if not path:
         path = "ipp/print"
 
-    # Clean display name from service_name (e.g., "HP LaserJet._ipp._tcp.local." -> "HP LaserJet")
     clean_name = service_name
     for st in IPP_SERVICE_TYPES:
         clean_name = clean_name.replace(f".{st}", "")
@@ -92,17 +93,14 @@ def construct_printer_info_from_mdns(
 
     pdl_list = parse_pdl_string(txt.get("pdl", ""))
 
-    # Determine TLS / IPPS
     is_tls = "_ipps" in service_type.lower() or txt.get("TLS", "").startswith("1")
     scheme = "ipps" if is_tls else "ipp"
     uri = f"{scheme}://{host}:{port}/{path}"
 
-    # Determine unique printer ID
     uuid_val = txt.get("UUID") or txt.get("uuid")
     if uuid_val:
         printer_id = uuid_val.lower().replace("urn:uuid:", "")
     else:
-        # Generate slugified printer_id from clean_name
         slug = re.sub(r"[^a-zA-Z0-9_-]", "_", clean_name).strip("_").lower()
         printer_id = slug or "printer"
 
@@ -124,7 +122,7 @@ class PrinterServiceListener:
     """Zeroconf ServiceListener callback for mDNS discovery."""
 
     def __init__(self, registry: Optional[PrinterRegistry] = None) -> None:
-        self.registry = registry or default_registry
+        self.registry = registry or defaultregistry
 
     def add_service(self, zc: Any, type_: str, name: str) -> None:
         """Handle newly discovered mDNS printing service."""
@@ -141,14 +139,12 @@ class PrinterServiceListener:
 
     def remove_service(self, zc: Any, type_: str, name: str) -> None:
         """Handle removed mDNS printing service."""
-        # Unregister by derived printer_id or name matching
         clean_name = name
         for st in IPP_SERVICE_TYPES:
             clean_name = clean_name.replace(f".{st}", "")
         clean_name = clean_name.rstrip(".")
         slug = re.sub(r"[^a-zA-Z0-9_-]", "_", clean_name).strip("_").lower()
 
-        # Try removing by slug or checking registry items
         for printer in self.registry.list_printers():
             if printer.printer_id == slug or printer.name == clean_name:
                 self.registry.unregister_printer(printer.printer_id)
