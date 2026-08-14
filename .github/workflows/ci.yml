@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, "verify/**" ]
   pull_request:
     branches: [ main, develop ]
 
@@ -20,11 +20,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e .[dev]
 
       - name: Run Ruff Linter
         run: ruff check src tests
@@ -33,4 +34,4 @@ jobs:
         run: mypy src
 
       - name: Run Test Suite with Pytest
-        run: pytest -v --cov=src/ipp_mcp_server --cov-report=term-missing
+        run: pytest -v --cov=ipp_mcp_server --cov-report=term-missing
