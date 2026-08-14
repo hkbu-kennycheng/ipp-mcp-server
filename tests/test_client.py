@@ -134,67 +134,112 @@ class MockIPPServer:
 
 
 class TestIPPClient(unittest.TestCase):
-    def setUp(self) -> None:
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.mock_server = MockIPPServer()
-        self.loop.run_until_complete(self.mock_server.start())
-        self.printer_uri = f"ipp://127.0.0.1:{self.mock_server.port}/ipp/print"
-        self.client = IPPClient(self.printer_uri, timeout=5.0)
-
-    def tearDown(self) -> None:
-        self.loop.run_until_complete(self.mock_server.stop())
-        self.loop.close()
-
     def test_get_printer_attributes(self) -> None:
-        attrs = self.loop.run_until_complete(self.client.get_printer_attributes())
-        self.assertEqual(attrs.printer_name, "Mock Test Printer")
-        self.assertEqual(attrs.printer_state, PrinterState.IDLE)
-        self.assertTrue(attrs.is_accepting_jobs)
-        self.assertEqual(len(attrs.marker_supplies), 1)
-        self.assertEqual(attrs.marker_supplies[0].name, "Black Ink")
-        self.assertEqual(attrs.marker_supplies[0].level, 95)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                attrs = await client.get_printer_attributes()
+                self.assertEqual(attrs.printer_name, "Mock Test Printer")
+                self.assertEqual(attrs.printer_state, PrinterState.IDLE)
+                self.assertTrue(attrs.is_accepting_jobs)
+                self.assertEqual(len(attrs.marker_supplies), 1)
+                self.assertEqual(attrs.marker_supplies[0].name, "Black Ink")
+                self.assertEqual(attrs.marker_supplies[0].level, 95)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_submit_print_job(self) -> None:
-        req = PrintJobRequest(
-            document_bytes=b"%PDF-1.4 sample payload",
-            document_format="application/pdf",
-            job_name="Monthly Financials",
-            user_name="testuser",
-            copies=1,
-            sides="one-sided",
-        )
-        job_info = self.loop.run_until_complete(self.client.submit_print_job(req))
-        self.assertGreater(job_info.job_id, 100)
-        self.assertEqual(job_info.job_state, JobState.PROCESSING)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                req = PrintJobRequest(
+                    document_bytes=b"%PDF-1.4 sample payload",
+                    document_format="application/pdf",
+                    job_name="Monthly Financials",
+                    user_name="testuser",
+                    copies=1,
+                    sides="one-sided",
+                )
+                job_info = await client.submit_print_job(req)
+                self.assertGreater(job_info.job_id, 100)
+                self.assertEqual(job_info.job_state, JobState.PROCESSING)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_validate_job(self) -> None:
-        req = PrintJobRequest(
-            document_bytes=b"sample",
-            job_name="Validation Test",
-        )
-        valid = self.loop.run_until_complete(self.client.validate_job(req))
-        self.assertTrue(valid)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                req = PrintJobRequest(
+                    document_bytes=b"sample",
+                    job_name="Validation Test",
+                )
+                valid = await client.validate_job(req)
+                self.assertTrue(valid)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_cancel_job(self) -> None:
-        success = self.loop.run_until_complete(self.client.cancel_job(job_id=101, reason="User cancelled"))
-        self.assertTrue(success)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                success = await client.cancel_job(job_id=101, reason="User cancelled")
+                self.assertTrue(success)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_get_job_attributes(self) -> None:
-        job = self.loop.run_until_complete(self.client.get_job_attributes(job_id=101))
-        self.assertEqual(job.job_id, 101)
-        self.assertEqual(job.job_state, JobState.COMPLETED)
-        self.assertEqual(job.impressions_completed, 2)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                job = await client.get_job_attributes(job_id=101)
+                self.assertEqual(job.job_id, 101)
+                self.assertEqual(job.job_state, JobState.COMPLETED)
+                self.assertEqual(job.impressions_completed, 2)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_get_jobs(self) -> None:
-        jobs = self.loop.run_until_complete(self.client.get_jobs(which_jobs="completed"))
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(jobs[0].job_id, 101)
+        async def runner() -> None:
+            mock_server = MockIPPServer()
+            await mock_server.start()
+            client = IPPClient(f"ipp://127.0.0.1:{mock_server.port}/ipp/print", timeout=5.0)
+            try:
+                jobs = await client.get_jobs(which_jobs="completed")
+                self.assertEqual(len(jobs), 1)
+                self.assertEqual(jobs[0].job_id, 101)
+            finally:
+                await mock_server.stop()
+
+        asyncio.run(runner())
 
     def test_connection_error_on_unreachable_host(self) -> None:
-        bad_client = IPPClient("ipp://127.0.0.1:59999/ipp/print", timeout=0.5)
-        with self.assertRaises(IPPError):
-            self.loop.run_until_complete(bad_client.get_printer_attributes())
+        async def runner() -> None:
+            bad_client = IPPClient("ipp://127.0.0.1:59999/ipp/print", timeout=0.5)
+            with self.assertRaises(IPPError):
+                await bad_client.get_printer_attributes()
+
+        asyncio.run(runner())
 
 
 if __name__ == "__main__":
