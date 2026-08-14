@@ -1,9 +1,11 @@
 """Asynchronous IPP Client and pyipp wrapper for printer communication."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import ssl
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from ipp_mcp_server.models import (

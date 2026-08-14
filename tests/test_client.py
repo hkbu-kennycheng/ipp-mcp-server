@@ -1,5 +1,7 @@
 """Unit tests for IPPClient async printer operations and error handling."""
 
+from __future__ import annotations
+
 import asyncio
 import unittest
 from ipp_mcp_server.client import IPPClient, IPPError
@@ -131,18 +133,21 @@ class MockIPPServer:
             await self.server.wait_closed()
 
 
-class TestIPPClientAsync(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self) -> None:
+class TestIPPClient(unittest.TestCase):
+    def setUp(self) -> None:
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         self.mock_server = MockIPPServer()
-        await self.mock_server.start()
+        self.loop.run_until_complete(self.mock_server.start())
         self.printer_uri = f"ipp://127.0.0.1:{self.mock_server.port}/ipp/print"
         self.client = IPPClient(self.printer_uri, timeout=5.0)
 
-    async def asyncTearDown(self) -> None:
-        await self.mock_server.stop()
+    def tearDown(self) -> None:
+        self.loop.run_until_complete(self.mock_server.stop())
+        self.loop.close()
 
-    async def test_get_printer_attributes(self) -> None:
-        attrs = await self.client.get_printer_attributes()
+    def test_get_printer_attributes(self) -> None:
+        attrs = self.loop.run_until_complete(self.client.get_printer_attributes())
         self.assertEqual(attrs.printer_name, "Mock Test Printer")
         self.assertEqual(attrs.printer_state, PrinterState.IDLE)
         self.assertTrue(attrs.is_accepting_jobs)
@@ -150,7 +155,7 @@ class TestIPPClientAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attrs.marker_supplies[0].name, "Black Ink")
         self.assertEqual(attrs.marker_supplies[0].level, 95)
 
-    async def test_submit_print_job(self) -> None:
+    def test_submit_print_job(self) -> None:
         req = PrintJobRequest(
             document_bytes=b"%PDF-1.4 sample payload",
             document_format="application/pdf",
@@ -159,37 +164,37 @@ class TestIPPClientAsync(unittest.IsolatedAsyncioTestCase):
             copies=1,
             sides="one-sided",
         )
-        job_info = await self.client.submit_print_job(req)
+        job_info = self.loop.run_until_complete(self.client.submit_print_job(req))
         self.assertGreater(job_info.job_id, 100)
         self.assertEqual(job_info.job_state, JobState.PROCESSING)
 
-    async def test_validate_job(self) -> None:
+    def test_validate_job(self) -> None:
         req = PrintJobRequest(
             document_bytes=b"sample",
             job_name="Validation Test",
         )
-        valid = await self.client.validate_job(req)
+        valid = self.loop.run_until_complete(self.client.validate_job(req))
         self.assertTrue(valid)
 
-    async def test_cancel_job(self) -> None:
-        success = await self.client.cancel_job(job_id=101, reason="User cancelled")
+    def test_cancel_job(self) -> None:
+        success = self.loop.run_until_complete(self.client.cancel_job(job_id=101, reason="User cancelled"))
         self.assertTrue(success)
 
-    async def test_get_job_attributes(self) -> None:
-        job = await self.client.get_job_attributes(job_id=101)
+    def test_get_job_attributes(self) -> None:
+        job = self.loop.run_until_complete(self.client.get_job_attributes(job_id=101))
         self.assertEqual(job.job_id, 101)
         self.assertEqual(job.job_state, JobState.COMPLETED)
         self.assertEqual(job.impressions_completed, 2)
 
-    async def test_get_jobs(self) -> None:
-        jobs = await self.client.get_jobs(which_jobs="completed")
+    def test_get_jobs(self) -> None:
+        jobs = self.loop.run_until_complete(self.client.get_jobs(which_jobs="completed"))
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0].job_id, 101)
 
-    async def test_connection_error_on_unreachable_host(self) -> None:
+    def test_connection_error_on_unreachable_host(self) -> None:
         bad_client = IPPClient("ipp://127.0.0.1:59999/ipp/print", timeout=0.5)
         with self.assertRaises(IPPError):
-            await bad_client.get_printer_attributes()
+            self.loop.run_until_complete(bad_client.get_printer_attributes())
 
 
 if __name__ == "__main__":
