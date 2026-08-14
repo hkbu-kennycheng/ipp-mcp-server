@@ -1,5 +1,7 @@
 """HTTP / SSE Transport implementation for MCP."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 class HttpSseTransport:
     """Handles HTTP and SSE transport for MCP JSON-RPC protocol."""
 
-    def __init__(self, server: "FastMCPServer", host: str = "127.0.0.1", port: int = 8000) -> None:
+    def __init__(self, server: FastMCPServer, host: str = "127.0.0.1", port: int = 8000) -> None:
         self.server = server
         self.host = host
         self.port = port
@@ -26,14 +28,20 @@ class HttpSseTransport:
             request_line = await reader.readline()
             if not request_line:
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
                 return
 
             req_str = request_line.decode("utf-8", errors="ignore")
             parts = req_str.strip().split()
             if len(parts) < 2:
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
                 return
 
             method, path = parts[0], parts[1]
@@ -67,9 +75,12 @@ class HttpSseTransport:
                 writer.write(endpoint_msg.encode("utf-8"))
                 await writer.drain()
 
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05)
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
             elif method in ("POST", "PUT") and path in ("/message", "/mcp", "/"):
                 body = await reader.readexactly(content_length) if content_length > 0 else b""
@@ -86,19 +97,26 @@ class HttpSseTransport:
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
             elif method == "GET" and path == "/health":
                 resp_body = json.dumps({"status": "ok", "server": self.server.name, "version": self.server.version}).encode("utf-8")
                 http_resp = (
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: application/json\r\n"
-                    f"Content-Length: {len(resp_body)}\r\n\r\n"
+                    f"Content-Length: {len(resp_body)}\r\n"
+                    "Access-Control-Allow-Origin: *\r\n\r\n"
                 )
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
             else:
                 resp_body = b"Not Found"
@@ -109,10 +127,13 @@ class HttpSseTransport:
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
         except Exception as e:
-            logger.error("Error handling HTTP connection: %s", e)
+            logger.error(f"Error handling HTTP connection: {e}")
             try:
                 writer.close()
                 await writer.wait_closed()
@@ -124,7 +145,7 @@ class HttpSseTransport:
         self._server_instance = await asyncio.start_server(
             self.handle_client, self.host, self.port
         )
-        logger.info("HTTP/SSE Transport listening on %s:%s", self.host, self.port)
+        logger.info(f"HTTP/SSE Transport listening on {self.host}:{self.port}")
         return self._server_instance
 
     async def run(self) -> None:
