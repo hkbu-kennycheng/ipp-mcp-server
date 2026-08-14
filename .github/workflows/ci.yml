@@ -29,10 +29,10 @@ jobs:
           pip install pydantic zeroconf pyipp pytest pytest-cov ruff mypy
 
       - name: Run Ruff Linter
-        run: python -m ruff check src tests --ignore F841,F811,F401
+        run: ruff check src tests
 
       - name: Run Mypy Type Checker
-        run: python -m mypy src --ignore-missing-imports
+        run: mypy src
 
       - name: Run Test Suite
-        run: PYTHONPATH=src python -m pytest -v
+        run: PYTHONPATH=src pytest -v
