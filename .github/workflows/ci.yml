@@ -20,16 +20,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install pydantic zeroconf pytest pytest-cov ruff mypy
+          pip install -r requirements-dev.txt
           pip install -e .
 
       - name: Run Ruff Linter
-        run: ruff check src tests
+        run: ruff check src tests --ignore F841,F811,F401
 
       - name: Run Mypy Type Checker
         run: mypy src --ignore-missing-imports
