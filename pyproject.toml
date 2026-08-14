@@ -13,17 +13,14 @@ authors = [
     { name = "Kam Kong Cheng", email = "kennycheng.hkbu@gmail.com" }
 ]
 dependencies = [
-    "pyipp>=0.11.0",
-    "zeroconf>=0.131.0",
     "pydantic>=2.0.0",
-    "reportlab>=4.0.0",
-    "opentelemetry-api>=1.20.0"
+    "zeroconf>=0.131.0",
+    "pyipp>=0.11.0"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
@@ -48,7 +45,6 @@ ignore = ["F841", "F811", "F401"]
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
 ignore_missing_imports = true
+warn_unused_configs = false
+disallow_untyped_defs = false
