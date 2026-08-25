@@ -188,10 +188,10 @@ class IPPClient:
             return response_msg
 
         finally:
-            writer.close()
             try:
+                writer.close()
                 await writer.wait_closed()
-            except Exception:
+            except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
                 pass
 
     async def get_printer_attributes(

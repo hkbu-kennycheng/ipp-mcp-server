@@ -34,9 +34,7 @@ class StdioTransport:
             line_str = line.decode("utf-8").strip()
             if not line_str:
                 continue
-            response_dict = await self.server.handle_jsonrpc(line_str)
-            import json
-            response_str = json.dumps(response_dict)
+            response_str = await self.server.handle_jsonrpc(line_str)
             sys.stdout.write(response_str + "\n")
             sys.stdout.flush()
 

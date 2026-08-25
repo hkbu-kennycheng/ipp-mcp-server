@@ -6,12 +6,13 @@ import asyncio
 import json
 import unittest
 from ipp_mcp_server.config import TransportType
+from ipp_mcp_server.registry import PrinterRegistry
 from ipp_mcp_server.server import FastMCPServer, create_server
 
 
-class TestFastMCPServer(unittest.TestCase):
+class TestFastMCPServer(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.server = FastMCPServer(name="test-server", version="1.0.0")
+        self.server = FastMCPServer(name="test-server", version="1.0.0", registry=PrinterRegistry())
 
     def test_init_defaults(self) -> None:
         srv = create_server()
@@ -36,26 +37,26 @@ class TestFastMCPServer(unittest.TestCase):
         tool_names_after = [t["name"] for t in tools_after]
         self.assertIn("echo", tool_names_after)
 
-    def test_handle_jsonrpc_initialize(self) -> None:
+    async def test_handle_jsonrpc_initialize(self) -> None:
         req = json.dumps({
             "jsonrpc": "2.0",
             "method": "initialize",
             "params": {},
             "id": 1,
         })
-        resp_str = asyncio.run(self.server.handle_jsonrpc(req))
+        resp_str = await self.server.handle_jsonrpc(req)
         resp = json.loads(resp_str)
         self.assertEqual(resp["jsonrpc"], "2.0")
         self.assertEqual(resp["id"], 1)
         self.assertEqual(resp["result"]["serverInfo"]["name"], "test-server")
 
-    def test_handle_jsonrpc_ping(self) -> None:
+    async def test_handle_jsonrpc_ping(self) -> None:
         req = json.dumps({"jsonrpc": "2.0", "method": "ping", "id": 2})
-        resp_str = asyncio.run(self.server.handle_jsonrpc(req))
+        resp_str = await self.server.handle_jsonrpc(req)
         resp = json.loads(resp_str)
         self.assertEqual(resp["result"], {})
 
-    def test_handle_jsonrpc_tools_call_sync_and_async(self) -> None:
+    async def test_handle_jsonrpc_tools_call_sync_and_async(self) -> None:
         @self.server.tool(name="add", description="Add numbers")
         def add(a: int, b: int) -> int:
             return a + b
@@ -72,7 +73,7 @@ class TestFastMCPServer(unittest.TestCase):
             "params": {"name": "add", "arguments": {"a": 5, "b": 10}},
             "id": 3,
         })
-        resp_add = json.loads(asyncio.run(self.server.handle_jsonrpc(call_add)))
+        resp_add = json.loads(await self.server.handle_jsonrpc(call_add))
         self.assertEqual(resp_add["result"]["content"][0]["text"], "15")
 
         # Test async tool call
@@ -82,35 +83,35 @@ class TestFastMCPServer(unittest.TestCase):
             "params": {"name": "async_hello", "arguments": {"name": "World"}},
             "id": 4,
         })
-        resp_hello = json.loads(asyncio.run(self.server.handle_jsonrpc(call_hello)))
+        resp_hello = json.loads(await self.server.handle_jsonrpc(call_hello))
         self.assertEqual(resp_hello["result"]["content"][0]["text"], "Hello World")
 
-    def test_handle_jsonrpc_default_list_printers_tool(self) -> None:
+    async def test_handle_jsonrpc_default_list_printers_tool(self) -> None:
         call_list = json.dumps({
             "jsonrpc": "2.0",
             "method": "tools/call",
             "params": {"name": "list_printers", "arguments": {}},
             "id": 5,
         })
-        resp = json.loads(asyncio.run(self.server.handle_jsonrpc(call_list)))
+        resp = json.loads(await self.server.handle_jsonrpc(call_list))
         self.assertIn("result", resp)
         self.assertEqual(resp["result"]["content"][0]["text"], "[]")
 
-    def test_handle_jsonrpc_errors(self) -> None:
+    async def test_handle_jsonrpc_errors(self) -> None:
         # Invalid JSON
-        resp_invalid = json.loads(asyncio.run(self.server.handle_jsonrpc(\"invalid json\")))
-        self.assertEqual(resp_invalid[\"error\"][\"code\"], -32700)
+        resp_invalid = json.loads(await self.server.handle_jsonrpc("invalid json"))
+        self.assertEqual(resp_invalid["error"]["code"], -32700)
 
         # Unknown tool
         call_unknown = json.dumps({
-            \"jsonrpc\": \"2.0\",
-            \"method\": \"tools/call\",
-            \"params\": {\"name\": \"nonexistent\"},
-            \"id\": 6,
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": "nonexistent"},
+            "id": 6,
         })
-        resp_unknown = json.loads(asyncio.run(self.server.handle_jsonrpc(call_unknown)))
-        self.assertEqual(resp_unknown[\"error\"][\"code\"], -32601)
+        resp_unknown = json.loads(await self.server.handle_jsonrpc(call_unknown))
+        self.assertEqual(resp_unknown["error"]["code"], -32601)
 
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     unittest.main()
