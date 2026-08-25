@@ -37,4 +37,4 @@ jobs:
         run: mypy src --ignore-missing-imports || true
 
       - name: Run Test Suite
-        run: PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py" -v
+        run: PYTHONPATH=src python -m unittest -v
