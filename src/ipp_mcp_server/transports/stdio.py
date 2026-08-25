@@ -1,5 +1,7 @@
 """STDIO Transport implementation for MCP."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import sys
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 class StdioTransport:
     """Handles stdio transport for MCP JSON-RPC protocol."""
 
-    def __init__(self, server: "FastMCPServer") -> None:
+    def __init__(self, server: FastMCPServer) -> None:
         self.server = server
 
     async def run(self) -> None:
@@ -32,6 +34,14 @@ class StdioTransport:
             line_str = line.decode("utf-8").strip()
             if not line_str:
                 continue
-            response_str = await self.server.handle_jsonrpc(line_str)
+            response_dict = await self.server.handle_jsonrpc(line_str)
+            import json
+            response_str = json.dumps(response_dict)
             sys.stdout.write(response_str + "\n")
             sys.stdout.flush()
+
+
+def run_stdio_server(server: FastMCPServer) -> None:
+    """Run standard input/output transport handler."""
+    transport = StdioTransport(server)
+    asyncio.run(transport.run())

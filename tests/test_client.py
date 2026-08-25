@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from typing import Optional, Set
 from ipp_mcp_server.client import IPPClient, IPPError
 from ipp_mcp_server.models import (
     IPPOperation,
@@ -21,16 +22,20 @@ class MockIPPServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 0) -> None:
         self.host = host
         self.port = port
-        self.server: asyncio.Server = None  # type: ignore
+        self.server: Optional[asyncio.Server] = None
         self.received_messages: list[IPPMessage] = []
         self.job_counter = 100
+        self._active_tasks: Set[asyncio.Task] = set()
 
     async def handle_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        task = asyncio.current_task()
+        if task:
+            self._active_tasks.add(task)
+            task.add_done_callback(self._active_tasks.discard)
+
         try:
             line = await reader.readline()
             if not line:
-                writer.close()
-                await writer.wait_closed()
                 return
 
             content_length = 0
@@ -113,13 +118,16 @@ class MockIPPServer:
 
             writer.write(http_resp)
             await writer.drain()
-            writer.close()
-            await writer.wait_closed()
+
+        except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
+            pass
         except Exception:
+            pass
+        finally:
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
+            except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
                 pass
 
     async def start(self) -> None:
@@ -130,7 +138,19 @@ class MockIPPServer:
     async def stop(self) -> None:
         if self.server:
             self.server.close()
-            await self.server.wait_closed()
+            try:
+                await self.server.wait_closed()
+            except (asyncio.CancelledError, Exception):
+                pass
+            self.server = None
+
+        if self._active_tasks:
+            tasks = list(self._active_tasks)
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._active_tasks.clear()
 
 
 class TestIPPClient(unittest.TestCase):

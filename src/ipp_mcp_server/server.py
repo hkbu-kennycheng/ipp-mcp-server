@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from ipp_mcp_server.config import ServerConfig
 from ipp_mcp_server.registry import PrinterInfo, PrinterRegistry, default_registry
 
@@ -107,16 +107,28 @@ class FastMCPServer:
             for t in self._tools.values()
         ]
 
-    async def handle_jsonrpc(self, request_data: str) -> str:
+    async def handle_jsonrpc(self, request_data: Union[str, bytes, bytearray, Dict[str, Any]]) -> str:
         """Process a JSON-RPC 2.0 request and return a JSON-RPC 2.0 response."""
-        try:
-            req = json.loads(request_data)
-        except Exception as err:
-            return json.dumps({
-                "jsonrpc": "2.0",
-                "error": {"code": -32700, "message": f"Parse error: {err}"},
-                "id": None,
-            })
+        if isinstance(request_data, dict):
+            req = request_data
+        elif isinstance(request_data, (bytes, bytearray)):
+            try:
+                req = json.loads(request_data.decode("utf-8"))
+            except Exception as err:
+                return json.dumps({
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": f"Parse error: {err}"},
+                    "id": None,
+                })
+        else:
+            try:
+                req = json.loads(str(request_data))
+            except Exception as err:
+                return json.dumps({
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": f"Parse error: {err}"},
+                    "id": None,
+                })
 
         req_id = req.get("id")
         method = req.get("method")

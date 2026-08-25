@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import unittest
+from typing import Optional
 from ipp_mcp_server.server import FastMCPServer
-from ipp_mcp_server.transports.sse import HttpSseTransport
+from ipp_mcp_server.transports.sse import HttpSseTransport, run_sse_server
+from ipp_mcp_server.transports.stdio import run_stdio_server
 
 
 class TestHttpSseTransport(unittest.TestCase):
@@ -16,23 +18,26 @@ class TestHttpSseTransport(unittest.TestCase):
             transport = HttpSseTransport(server, host="127.0.0.1", port=0)
             async_server = await transport.start()
             port = async_server.sockets[0].getsockname()[1]
+            writer: Optional[asyncio.StreamWriter] = None
 
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
-                req = f"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+                req = "GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
                 writer.write(req.encode("utf-8"))
                 await writer.drain()
 
                 response = await reader.read()
-                writer.close()
-                await writer.wait_closed()
-
                 resp_str = response.decode("utf-8")
                 self.assertIn("200 OK", resp_str)
                 self.assertIn('"status": "ok"', resp_str)
             finally:
-                async_server.close()
-                await async_server.wait_closed()
+                if writer:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
+                        pass
+                await transport.stop()
 
         asyncio.run(runner())
 
@@ -47,6 +52,7 @@ class TestHttpSseTransport(unittest.TestCase):
             transport = HttpSseTransport(server, host="127.0.0.1", port=0)
             async_server = await transport.start()
             port = async_server.sockets[0].getsockname()[1]
+            writer: Optional[asyncio.StreamWriter] = None
 
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
@@ -58,25 +64,27 @@ class TestHttpSseTransport(unittest.TestCase):
                 })
                 payload_bytes = payload.encode("utf-8")
                 req = (
-                    f"POST /mcp HTTP/1.1\r\n"
-                    f"Host: 127.0.0.1\r\n"
-                    f"Content-Type: application/json\r\n"
+                    "POST /mcp HTTP/1.1\r\n"
+                    "Host: 127.0.0.1\r\n"
+                    "Content-Type: application/json\r\n"
                     f"Content-Length: {len(payload_bytes)}\r\n"
-                    f"Connection: close\r\n\r\n"
+                    "Connection: close\r\n\r\n"
                 ).encode("utf-8") + payload_bytes
                 writer.write(req)
                 await writer.drain()
 
                 response = await reader.read()
-                writer.close()
-                await writer.wait_closed()
-
                 resp_str = response.decode("utf-8")
                 self.assertIn("200 OK", resp_str)
                 self.assertIn("printer_ready", resp_str)
             finally:
-                async_server.close()
-                await async_server.wait_closed()
+                if writer:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
+                        pass
+                await transport.stop()
 
         asyncio.run(runner())
 
@@ -86,25 +94,34 @@ class TestHttpSseTransport(unittest.TestCase):
             transport = HttpSseTransport(server, host="127.0.0.1", port=0)
             async_server = await transport.start()
             port = async_server.sockets[0].getsockname()[1]
+            writer: Optional[asyncio.StreamWriter] = None
 
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
-                req = f"GET /sse HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+                req = "GET /sse HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
                 writer.write(req.encode("utf-8"))
                 await writer.drain()
 
                 response = await reader.read()
-                writer.close()
-                await writer.wait_closed()
-
                 resp_str = response.decode("utf-8")
                 self.assertIn("200 OK", resp_str)
                 self.assertIn("event: endpoint", resp_str)
             finally:
-                async_server.close()
-                await async_server.wait_closed()
+                if writer:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
+                        pass
+                await transport.stop()
 
         asyncio.run(runner())
+
+    def test_stdio_server_callable(self) -> None:
+        self.assertTrue(callable(run_stdio_server))
+
+    def test_sse_server_callable(self) -> None:
+        self.assertTrue(callable(run_sse_server))
 
 
 if __name__ == "__main__":

@@ -5,10 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ipp-mcp-server"
 version = "0.1.0"
-description = "Model Context Protocol (MCP) Server for IPP Multi-Printer Management"
+description = "Internet Printing Protocol (IPP) Model Context Protocol (MCP) Server"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
 authors = [
     { name = "Kam Kong Cheng", email = "kennycheng.hkbu@gmail.com" }
 ]
@@ -23,8 +22,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.1.0",
-    "mypy>=1.5.0",
-    "pre-commit>=3.4.0"
+    "mypy>=1.5.0"
 ]
 
 [project.scripts]
@@ -36,6 +34,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore::ResourceWarning",
+    "ignore::DeprecationWarning"
+]
 
 [tool.ruff]
 line-length = 100

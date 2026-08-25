@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Set
 
 if TYPE_CHECKING:
     from ipp_mcp_server.server import FastMCPServer
@@ -21,32 +21,28 @@ class HttpSseTransport:
         self.host = host
         self.port = port
         self._server_instance: Optional[asyncio.Server] = None
+        self._active_tasks: Set[asyncio.Task] = set()
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        """Handle incoming HTTP requests and SSE endpoints."""
+        """Handle incoming HTTP/SSE connection with robust socket teardown."""
+        task = asyncio.current_task()
+        if task:
+            self._active_tasks.add(task)
+            task.add_done_callback(self._active_tasks.discard)
+
         try:
             request_line = await reader.readline()
             if not request_line:
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
                 return
 
             req_str = request_line.decode("utf-8", errors="ignore")
             parts = req_str.strip().split()
             if len(parts) < 2:
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
                 return
 
             method, path = parts[0], parts[1]
 
-            # Read headers
+            # Read Headers
             content_length = 0
             while True:
                 header_line = await reader.readline()
@@ -58,36 +54,29 @@ class HttpSseTransport:
                     if k.strip().lower() == "content-length":
                         content_length = int(v.strip())
 
-            if method == "GET" and path == "/sse":
-                # SSE Endpoint
-                sse_headers = (
+            # Route Request
+            if method == "GET" and path in ("/sse", "/events"):
+                http_resp = (
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: text/event-stream\r\n"
                     "Cache-Control: no-cache\r\n"
                     "Connection: keep-alive\r\n"
                     "Access-Control-Allow-Origin: *\r\n\r\n"
                 )
-                writer.write(sse_headers.encode("utf-8"))
+                writer.write(http_resp.encode("utf-8"))
                 await writer.drain()
 
-                # Send endpoint event
-                endpoint_msg = "event: endpoint\r\ndata: /message\r\n\r\n"
+                endpoint_msg = "event: endpoint\r\ndata: /mcp\r\n\r\n"
                 writer.write(endpoint_msg.encode("utf-8"))
                 await writer.drain()
 
                 await asyncio.sleep(0.05)
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
 
             elif method in ("POST", "PUT") and path in ("/message", "/mcp", "/"):
                 body = await reader.readexactly(content_length) if content_length > 0 else b""
-                body_str = body.decode("utf-8")
-                response_str = await self.server.handle_jsonrpc(body_str)
+                resp_str = await self.server.handle_jsonrpc(body)
+                resp_body = resp_str.encode("utf-8")
 
-                resp_body = response_str.encode("utf-8")
                 http_resp = (
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: application/json\r\n"
@@ -96,14 +85,13 @@ class HttpSseTransport:
                 )
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
 
             elif method == "GET" and path == "/health":
-                resp_body = json.dumps({"status": "ok", "server": self.server.name, "version": self.server.version}).encode("utf-8")
+                resp_body = json.dumps({
+                    "status": "ok",
+                    "server": self.server.name,
+                    "version": self.server.version,
+                }).encode("utf-8")
                 http_resp = (
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: application/json\r\n"
@@ -112,44 +100,62 @@ class HttpSseTransport:
                 )
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
 
             else:
                 resp_body = b"Not Found"
                 http_resp = (
                     "HTTP/1.1 404 Not Found\r\n"
+                    "Content-Type: text/plain\r\n"
                     f"Content-Length: {len(resp_body)}\r\n\r\n"
                 )
                 writer.write(http_resp.encode("utf-8") + resp_body)
                 await writer.drain()
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
 
+        except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
+            pass
         except Exception as e:
             logger.error(f"Error handling HTTP connection: {e}")
+        finally:
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
+            except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, Exception):
                 pass
 
     async def start(self) -> asyncio.Server:
-        """Start the HTTP / SSE server."""
+        """Start the HTTP/SSE transport server."""
         self._server_instance = await asyncio.start_server(
             self.handle_client, self.host, self.port
         )
         logger.info(f"HTTP/SSE Transport listening on {self.host}:{self.port}")
         return self._server_instance
 
+    async def stop(self) -> None:
+        """Stop the server and cleanly cancel active client tasks."""
+        if self._server_instance:
+            self._server_instance.close()
+            try:
+                await self._server_instance.wait_closed()
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._server_instance = None
+
+        if self._active_tasks:
+            tasks = list(self._active_tasks)
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._active_tasks.clear()
+
     async def run(self) -> None:
-        """Run and serve until cancelled."""
-        srv = await self.start()
-        async with srv:
-            await srv.serve_forever()
+        """Run the server until interrupted."""
+        server = await self.start()
+        async with server:
+            await server.serve_forever()
+
+
+def run_sse_server(server: FastMCPServer, host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Run Server-Sent Events transport handler."""
+    transport = HttpSseTransport(server=server, host=host, port=port)
+    asyncio.run(transport.run())
