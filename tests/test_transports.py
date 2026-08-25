@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import unittest
-from typing import Optional
 from ipp_mcp_server.registry import PrinterRegistry
 from ipp_mcp_server.server import FastMCPServer
 from ipp_mcp_server.transports.sse import HttpSseTransport, run_sse_server
