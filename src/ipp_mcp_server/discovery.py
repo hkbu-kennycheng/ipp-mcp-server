@@ -84,6 +84,7 @@ def construct_printer_info_from_mdns(
     if not path:
         path = "ipp/print"
 
+    # Clean display name from service_name (e.g., "HP LaserJet._ipp._tcp.local." -> "HP LaserJet")
     clean_name = service_name
     for st in IPP_SERVICE_TYPES:
         clean_name = clean_name.replace(f".{st}", "")
@@ -93,14 +94,17 @@ def construct_printer_info_from_mdns(
 
     pdl_list = parse_pdl_string(txt.get("pdl", ""))
 
+    # Determine TLS / IPPS
     is_tls = "_ipps" in service_type.lower() or txt.get("TLS", "").startswith("1")
     scheme = "ipps" if is_tls else "ipp"
     uri = f"{scheme}://{host}:{port}/{path}"
 
+    # Determine unique printer ID
     uuid_val = txt.get("UUID") or txt.get("uuid")
     if uuid_val:
         printer_id = uuid_val.lower().replace("urn:uuid:", "")
     else:
+        # Generate slugified printer_id from clean_name
         slug = re.sub(r"[^a-zA-Z0-9_-]", "_", clean_name).strip("_").lower()
         printer_id = slug or "printer"
 
@@ -139,12 +143,14 @@ class PrinterServiceListener:
 
     def remove_service(self, zc: Any, type_: str, name: str) -> None:
         """Handle removed mDNS printing service."""
+        # Unregister by derived printer_id or name matching
         clean_name = name
         for st in IPP_SERVICE_TYPES:
             clean_name = clean_name.replace(f".{st}", "")
         clean_name = clean_name.rstrip(".")
         slug = re.sub(r"[^a-zA-Z0-9_-]", "_", clean_name).strip("_").lower()
 
+        # Try removing by slug or checking registry items
         for printer in self.registry.list_printers():
             if printer.printer_id == slug or printer.name == clean_name:
                 self.registry.unregister_printer(printer.printer_id)
@@ -173,7 +179,7 @@ class MDNSDiscovery:
         self._browsers: List[Any] = []
         self._active = False
 
-    def start(self, zc_instance: Optional[Any] = None) -> None:
+    def start(self, zc_instance: Optional[Any] = None, browser_cls: Optional[Any] = None) -> None:
         """Start mDNS discovery browsers."""
         if self._active:
             return
@@ -181,15 +187,23 @@ class MDNSDiscovery:
         if zc_instance:
             self._zeroconf = zc_instance
         elif ZEROCONF_AVAILABLE and Zeroconf:
-            self._zeroconf = Zeroconf()
+            try:
+                self._zeroconf = Zeroconf()
+            except Exception as err:
+                logger.warning("Could not initialize Zeroconf: %s", err)
+                return
         else:
             logger.warning("zeroconf library is not available. mDNS discovery disabled.")
             return
 
+        browser_factory = browser_cls if browser_cls is not None else ServiceBrowser
         for service_type in IPP_SERVICE_TYPES:
-            if ServiceBrowser:
-                browser = ServiceBrowser(self._zeroconf, service_type, self.listener)
-                self._browsers.append(browser)
+            if browser_factory:
+                try:
+                    browser = browser_factory(self._zeroconf, service_type, self.listener)
+                    self._browsers.append(browser)
+                except Exception as err:
+                    logger.warning("Could not create ServiceBrowser for %s: %s", service_type, err)
 
         self._active = True
         logger.info("Started mDNS IPP printer discovery for types: %s", IPP_SERVICE_TYPES)
@@ -200,12 +214,19 @@ class MDNSDiscovery:
             return
 
         for browser in self._browsers:
-            if hasattr(browser, "cancel"):
-                browser.cancel()
+            try:
+                if hasattr(browser, "cancel"):
+                    browser.cancel()
+            except Exception:
+                pass
         self._browsers.clear()
 
-        if self._zeroconf and hasattr(self._zeroconf, "close"):
-            self._zeroconf.close()
+        if self._zeroconf:
+            try:
+                if hasattr(self._zeroconf, "close"):
+                    self._zeroconf.close()
+            except Exception:
+                pass
             self._zeroconf = None
 
         self._active = False
