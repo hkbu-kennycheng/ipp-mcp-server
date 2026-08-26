@@ -1,5 +1,7 @@
 """mDNS Discovery service for IPP printers using DNS-SD / zeroconf."""
 
+from __future__ import annotations
+
 import logging
 import re
 from typing import Any, Dict, List, Optional, Union
@@ -13,10 +15,10 @@ try:
     from zeroconf import ServiceBrowser, ServiceInfo, Zeroconf
     ZEROCONF_AVAILABLE = True
 except ImportError:  # pragma: no cover
-    zeroconf = None
-    ServiceBrowser = None
-    ServiceInfo = None
-    Zeroconf = None
+    zeroconf = None  # type: ignore[assignment]
+    ServiceBrowser = None  # type: ignore[assignment]
+    ServiceInfo = None  # type: ignore[assignment]
+    Zeroconf = None  # type: ignore[assignment]
     ZEROCONF_AVAILABLE = False
 
 
@@ -177,7 +179,7 @@ class MDNSDiscovery:
         self._browsers: List[Any] = []
         self._active = False
 
-    def start(self, zc_instance: Optional[Any] = None) -> None:
+    def start(self, zc_instance: Optional[Any] = None, browser_cls: Optional[Any] = None) -> None:
         """Start mDNS discovery browsers."""
         if self._active:
             return
@@ -185,15 +187,23 @@ class MDNSDiscovery:
         if zc_instance:
             self._zeroconf = zc_instance
         elif ZEROCONF_AVAILABLE and Zeroconf:
-            self._zeroconf = Zeroconf()
+            try:
+                self._zeroconf = Zeroconf()
+            except Exception as err:
+                logger.warning("Could not initialize Zeroconf: %s", err)
+                return
         else:
             logger.warning("zeroconf library is not available. mDNS discovery disabled.")
             return
 
+        browser_factory = browser_cls if browser_cls is not None else ServiceBrowser
         for service_type in IPP_SERVICE_TYPES:
-            if ServiceBrowser:
-                browser = ServiceBrowser(self._zeroconf, service_type, self.listener)
-                self._browsers.append(browser)
+            if browser_factory:
+                try:
+                    browser = browser_factory(self._zeroconf, service_type, self.listener)
+                    self._browsers.append(browser)
+                except Exception as err:
+                    logger.warning("Could not create ServiceBrowser for %s: %s", service_type, err)
 
         self._active = True
         logger.info("Started mDNS IPP printer discovery for types: %s", IPP_SERVICE_TYPES)
@@ -204,12 +214,19 @@ class MDNSDiscovery:
             return
 
         for browser in self._browsers:
-            if hasattr(browser, "cancel"):
-                browser.cancel()
+            try:
+                if hasattr(browser, "cancel"):
+                    browser.cancel()
+            except Exception:
+                pass
         self._browsers.clear()
 
-        if self._zeroconf and hasattr(self._zeroconf, "close"):
-            self._zeroconf.close()
+        if self._zeroconf:
+            try:
+                if hasattr(self._zeroconf, "close"):
+                    self._zeroconf.close()
+            except Exception:
+                pass
             self._zeroconf = None
 
         self._active = False

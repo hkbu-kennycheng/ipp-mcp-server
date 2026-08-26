@@ -1,7 +1,17 @@
+from __future__ import annotations
+
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 """Unit tests for mDNS Discovery and ServiceListener."""
 
 import unittest
 from unittest.mock import MagicMock
+
 from ipp_mcp_server.discovery import (
     MDNSDiscovery,
     PrinterServiceListener,
@@ -61,7 +71,6 @@ class TestMDNSDiscovery(unittest.TestCase):
         self.assertEqual(printer.path, "printers/office_printer")
 
     def test_printer_service_listener_add_and_remove(self) -> None:
-        # Mock Zeroconf & ServiceInfo
         mock_zc = MagicMock()
         mock_info = MagicMock()
         mock_info.server = "printer.local."
@@ -77,27 +86,26 @@ class TestMDNSDiscovery(unittest.TestCase):
         service_type = "_ipp._tcp.local."
         service_name = "Brother HL-L2350DW._ipp._tcp.local."
 
-        # Test add_service
         self.listener.add_service(mock_zc, service_type, service_name)
         printers = self.registry.list_printers()
         self.assertEqual(len(printers), 1)
         self.assertEqual(printers[0].printer_id, "brother-123")
         self.assertEqual(printers[0].host, "10.0.0.50")
 
-        # Test remove_service
         self.listener.remove_service(mock_zc, service_type, service_name)
         self.assertEqual(len(self.registry.list_printers()), 0)
 
     def test_mdns_discovery_lifecycle_with_mock_zeroconf(self) -> None:
         mock_zc = MagicMock()
+        mock_browser_factory = MagicMock()
         discovery = MDNSDiscovery(self.registry)
 
         self.assertFalse(discovery.is_active())
-        discovery.start(zc_instance=mock_zc)
+        discovery.start(zc_instance=mock_zc, browser_cls=mock_browser_factory)
         self.assertTrue(discovery.is_active())
 
-        # Start again should be no-op
-        discovery.start(zc_instance=mock_zc)
+        # Verify idempotency
+        discovery.start(zc_instance=mock_zc, browser_cls=mock_browser_factory)
         self.assertTrue(discovery.is_active())
 
         discovery.stop()

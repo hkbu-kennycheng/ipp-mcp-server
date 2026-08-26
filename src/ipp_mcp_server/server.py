@@ -1,13 +1,24 @@
 """FastMCP / MCP Server core implementation with Printer Registry integration."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from ipp_mcp_server.config import ServerConfig
 from ipp_mcp_server.registry import PrinterInfo, PrinterRegistry, default_registry
 
 logger = logging.getLogger(__name__)
+
+
+def _dump_model(model: Any) -> Dict[str, Any]:
+    """Helper to dump Pydantic models across v1 and v2."""
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    elif hasattr(model, "dict"):
+        return model.dict()
+    return dict(model)
 
 
 class FastMCPServer:
@@ -38,12 +49,12 @@ class FastMCPServer:
         @self.tool(name="list_printers", description="List all discovered and registered IPP printers.")
         def list_printers() -> List[Dict[str, Any]]:
             printers = self.registry.list_printers()
-            return [p.model_dump() for p in printers]
+            return [_dump_model(p) for p in printers]
 
         @self.tool(name="get_printer", description="Get details for a specific printer by printer_id.")
         def get_printer(printer_id: str) -> Optional[Dict[str, Any]]:
             printer = self.registry.get_printer(printer_id)
-            return printer.model_dump() if printer else None
+            return _dump_model(printer) if printer else None
 
         @self.tool(name="register_printer", description="Manually register or update an IPP printer profile.")
         def register_printer(
@@ -70,18 +81,18 @@ class FastMCPServer:
                 state="idle",
             )
             self.registry.register_printer(printer)
-            return printer.model_dump()
+            return _dump_model(printer)
 
-    def tool(self, name: Optional[str] = None, description: Optional[str] = None) -> Callable:
+    def tool(self, name: Optional[str] = None, description: Optional[str] = None) -> Callable[..., Any]:
         """Decorator to register a tool with the MCP server."""
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             tool_name = name or func.__name__
             tool_desc = description or (func.__doc__.strip() if func.__doc__ else "")
             self.register_tool(tool_name, tool_desc, func)
             return func
         return decorator
 
-    def register_tool(self, name: str, description: str, func: Callable) -> None:
+    def register_tool(self, name: str, description: str, func: Callable[..., Any]) -> None:
         """Register a tool function explicitly."""
         self._tools[name] = {
             "name": name,
@@ -96,16 +107,28 @@ class FastMCPServer:
             for t in self._tools.values()
         ]
 
-    async def handle_jsonrpc(self, request_data: str) -> str:
+    async def handle_jsonrpc(self, request_data: Union[str, bytes, bytearray, Dict[str, Any]]) -> str:
         """Process a JSON-RPC 2.0 request and return a JSON-RPC 2.0 response."""
-        try:
-            req = json.loads(request_data)
-        except Exception as err:
-            return json.dumps({
-                "jsonrpc": "2.0",
-                "error": {"code": -32700, "message": f"Parse error: {err}"},
-                "id": None,
-            })
+        if isinstance(request_data, dict):
+            req = request_data
+        elif isinstance(request_data, (bytes, bytearray)):
+            try:
+                req = json.loads(request_data.decode("utf-8"))
+            except Exception as err:
+                return json.dumps({
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": f"Parse error: {err}"},
+                    "id": None,
+                })
+        else:
+            try:
+                req = json.loads(str(request_data))
+            except Exception as err:
+                return json.dumps({
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": f"Parse error: {err}"},
+                    "id": None,
+                })
 
         req_id = req.get("id")
         method = req.get("method")
@@ -132,7 +155,7 @@ class FastMCPServer:
             })
         elif method == "tools/call":
             tool_name = params.get("name")
-            tool_args = params.get("arguments", {})
+            tool_args = params.get("arguments") or {}
             if tool_name not in self._tools:
                 return json.dumps({
                     "jsonrpc": "2.0",
