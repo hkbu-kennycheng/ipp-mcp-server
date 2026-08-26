@@ -1,6 +1,13 @@
-"""Unit tests for FastMCPServer core class."""
-
 from __future__ import annotations
+
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+"""Unit tests for FastMCPServer core class."""
 
 import asyncio
 import json
@@ -12,6 +19,9 @@ from ipp_mcp_server.server import FastMCPServer, create_server
 
 class TestFastMCPServer(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        self.server = FastMCPServer(name="test-server", version="1.0.0", registry=PrinterRegistry())
+
+    async def asyncSetUp(self) -> None:
         self.server = FastMCPServer(name="test-server", version="1.0.0", registry=PrinterRegistry())
 
     def test_init_defaults(self) -> None:

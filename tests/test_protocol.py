@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 """Unit tests for IPP binary protocol encoding and decoding."""
 
 import unittest
@@ -16,8 +25,7 @@ from ipp_mcp_server.protocol import (
 
 class TestIPPProtocol(unittest.TestCase):
     def test_encode_decode_roundtrip(self) -> None:
-        msg = IPPMessage(
-            version=(2, 0),
+        msg = IPPMessage(\n            version=(2, 0),
             status_or_operation=IPPOperation.GET_PRINTER_ATTRIBUTES,
             request_id=42,
             operation_attributes={

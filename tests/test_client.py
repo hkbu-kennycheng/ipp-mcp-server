@@ -1,6 +1,13 @@
-"""Unit tests for IPPClient async printer operations and error handling."""
-
 from __future__ import annotations
+
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+"""Unit tests for IPPClient async printer operations and error handling."""
 
 import asyncio
 import unittest
@@ -146,7 +153,7 @@ class MockIPPServer:
 
         if self._active_tasks:
             tasks = list(self._active_tasks)
-            for t in tasks:\
+            for t in tasks:
                 if not t.done():
                     t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)

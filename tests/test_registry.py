@@ -1,6 +1,13 @@
-"""Unit tests for PrinterRegistry and PrinterInfo data model."""
-
 from __future__ import annotations
+
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+"""Unit tests for PrinterRegistry and PrinterInfo data model."""
 
 import unittest
 from ipp_mcp_server.registry import PrinterInfo, PrinterRegistry

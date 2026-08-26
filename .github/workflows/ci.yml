@@ -15,9 +15,6 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
-    env:
-      PYTHONPATH: src
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,4 +39,4 @@ jobs:
 
       - name: Run Test Suite
         run: |
-          python -m unittest discover -s tests -p "test_*.py" -v
+          PYTHONPATH=src python -m unittest discover -s tests -v
