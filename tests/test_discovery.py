@@ -88,14 +88,15 @@ class TestMDNSDiscovery(unittest.TestCase):
 
     def test_mdns_discovery_lifecycle_with_mock_zeroconf(self) -> None:
         mock_zc = MagicMock()
+        mock_browser_factory = MagicMock()
         discovery = MDNSDiscovery(self.registry)
 
         self.assertFalse(discovery.is_active())
-        discovery.start(zc_instance=mock_zc)
+        discovery.start(zc_instance=mock_zc, browser_cls=mock_browser_factory)
         self.assertTrue(discovery.is_active())
 
         # Verify idempotency
-        discovery.start(zc_instance=mock_zc)
+        discovery.start(zc_instance=mock_zc, browser_cls=mock_browser_factory)
         self.assertTrue(discovery.is_active())
 
         discovery.stop()
