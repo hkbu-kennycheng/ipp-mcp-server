@@ -24,19 +24,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Run CI Checks and Tests
         run: |
+          set -x
           python -m pip install --upgrade pip
-          python -m pip install pydantic zeroconf ruff mypy
-
-      - name: Run Ruff Linter
-        run: |
+          pip install pydantic zeroconf ruff mypy
           python -m ruff check src tests || true
-
-      - name: Run Mypy Type Checker
-        run: |
           python -m mypy src --ignore-missing-imports || true
-
-      - name: Run Test Suite
-        run: |
-          PYTHONPATH=src python -m unittest discover -s tests -v
+          PYTHONPATH=src python -m unittest discover -s tests -p "test_*.py" -v
